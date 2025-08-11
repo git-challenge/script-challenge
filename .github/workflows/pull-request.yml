@@ -1,0 +1,34 @@
+name: PR - Preview
+
+on:
+  pull_request:
+    branches: ["main"]
+    types: ["opened", "synchronize", "reopened"]
+
+permissions:
+  contents: read
+
+jobs:
+  draft:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Just for check
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          SOURCE_BRANCH="${GITHUB_HEAD_REF}"
+          TARGET_BRANCH="${GITHUB_BASE_REF}"
+
+          echo "Validando GitFlow..."
+          echo "📌 PR source branch: $SOURCE_BRANCH"
+          echo "➡ PR target branch: $TARGET_BRANCH"
+
+          fail() {
+            echo "❌ ERROR: $1"
+            exit 1
+          }
