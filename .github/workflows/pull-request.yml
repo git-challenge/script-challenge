@@ -1,34 +1,31 @@
-name: PR - Preview
+name: Python app - Flow
 
 on:
   pull_request:
-    branches: ["main"]
+    branches: ["main", "develop"]
     types: ["opened", "synchronize", "reopened"]
+    paths: ["config/queries.yml"]
 
 permissions:
   contents: read
 
 jobs:
-  draft:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      # Basic checkout
+      - uses: actions/checkout@v5
 
-      - name: Just for check
-        shell: bash
-        run: |
-          set -euo pipefail
+      # Set up python and install dependencies
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip" # caching pip dependencies
+          cache-dependency-path: "**/requirements.txt"
 
-          SOURCE_BRANCH="${GITHUB_HEAD_REF}"
-          TARGET_BRANCH="${GITHUB_BASE_REF}"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
 
-          echo "Validando GitFlow..."
-          echo "📌 PR source branch: $SOURCE_BRANCH"
-          echo "➡ PR target branch: $TARGET_BRANCH"
-
-          fail() {
-            echo "❌ ERROR: $1"
-            exit 1
-          }
+      - name: Run python script
+        run: python ./artworks-report.py --dry-run
