@@ -1,0 +1,6 @@
+reports:
+  basic:
+    description: "Reporte básico de obras"
+    fields: ["id", "title", "artist_display"]
+    default_search: "war"
+    default_limit: 5

@@ -7,19 +7,17 @@ from reportlab.pdfgen import canvas
 
 
 def generate_report(data):
-    os.makedirs("data", exist_ok=True)
-    os.makedirs("reports", exist_ok=True)
+    os.makedirs("artifacts/json", exist_ok=True)
+    os.makedirs("artifacts/pdf", exist_ok=True)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    # Guardar JSON
-    json_path = f"data/report_{timestamp}.json"
+    json_path = f"artifacts/json/report_{timestamp}.json"
     with open(json_path, "w") as f:
         json.dump(data, f, indent=2)
     logging.info(f"JSON saved at {json_path}")
 
-    # Generar PDF básico
-    pdf_path = f"reports/report_{timestamp}.pdf"
+    pdf_path = f"artifacts/pdf/report_{timestamp}.pdf"
     c = canvas.Canvas(pdf_path, pagesize=letter)
     c.drawString(100, 750, "Artworks Report")
     y = 700

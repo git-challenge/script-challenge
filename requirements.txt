@@ -1,4 +1,7 @@
-PyYAML
-reportlab
-pandas
-requests
+PyYAML>=6.0
+requests>=2.31.0
+pandas>=2.2.0
+reportlab>=4.0.7
+matplotlib>=3.8.0
+yagmail>=0.15.293
+python-dotenv>=1.0.1

@@ -1,16 +1,20 @@
+import os
 import smtplib
 import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
 from email import encoders
+from dotenv import load_dotenv
 
+
+load_dotenv()
 
 def send_email(to_email, pdf_path, json_path):
-    SMTP_SERVER = "smtp.example.com"
-    SMTP_PORT = 587
-    SMTP_USER = "your_user"
-    SMTP_PASS = "your_pass"
+    SMTP_SERVER = os.getenv("SMTP_SERVER")
+    SMTP_PORT = int(os.getenv("SMTP_PORT"))
+    SMTP_USER = os.getenv("SMTP_USER")
+    SMTP_PASS = os.getenv("SMTP_PASS")
 
     logging.info(f"Sending email to {to_email}")
 
