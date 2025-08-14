@@ -1,0 +1,64 @@
+name: Python application
+
+on:
+  pull_request:
+    branches: ["main", "develop"]
+    types: ["opened", "synchronize", "reopened"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v5
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+        cache: "pip" # caching pip dependencies
+        cache-dependency-path: "./requirements.txt"
+  
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+    - name: Run application
+      run: python ./artworks-report.py --config "config/test.yml" --out out --dry-run
+    
+    - name: Verify outputs
+      run: |
+        set -euo pipefail
+        if [ ! -d out ]; then
+          echo "❌ Upss... No existe el directorio out"
+          exit 1
+        fi
+        
+        # Habilitar nullglob para asegurar expansión aún sin archivos
+        shopt -s nullglob
+
+        json=(out/*.json)
+        pdf=(out/*.pdf)
+
+        echo "📄 JSON encontrados: ${#json[@]} -> ${json[@]:-}"
+        echo "📄 PDF  encontrados: ${#pdf[@]}  -> ${pdf[@]:-}"
+
+        if (( ${#json[@]} != 1 )); then
+          echo "❌ Se esperaba exactamente 1 archivo .json en 'out/'."
+          ls -l out || true
+          exit 1
+        fi
+
+        if (( ${#pdf[@]} != 1 )); then
+          echo "❌ Se esperaba exactamente 1 archivo .pdf en 'out/'."
+          ls -l out || true
+          exit 1
+        fi
+
+        echo "✅ Validación OK"
+
+
