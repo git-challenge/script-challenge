@@ -5,7 +5,7 @@ from src.core import fetch_artworks, generate_report, send_email
 
 def run_report(args):
     logging.info("Loading configuration...")
-    queries = load_queries("queries.yml")
+    queries = load_queries("config/queries.yml")
 
     logging.info("Fetching data...")
     data = fetch_artworks(
