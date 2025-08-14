@@ -85,7 +85,7 @@ jobs:
           python <<'PY'
           import yaml
 
-          name = ${{ matrix.name }}
+          name = "${{ matrix.name }}"
 
           cfg = yaml.safe_load(open("config/queries.yml", "r", encoding="utf-8")) or {}
           rep = [
