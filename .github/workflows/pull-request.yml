@@ -120,7 +120,7 @@ jobs:
                   break
               fi
           now=$SECONDS
-          elapsed = $(( now - start ))
+          elapsed=$(( now - start ))
           if (( elapsed > ${MAX_RUNTIME} )); then
               echo "🛎️ Upsss, tiempo excedido. Abortando"
               exit 1
