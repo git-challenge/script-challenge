@@ -165,12 +165,12 @@ jobs:
       - name: Build PR comment (HTML) with gh
         shell: bash
         env:
-          PREVIEW_COLUMNS: "id,name"     
-          PREVIEW_HEADERS: "ID,Nombre"
+          PREVIEW_COLUMNS: "id,title,artist_title"     
+          PREVIEW_HEADERS: "ID,Titulo,Artista"
           PREVIEW_LIMIT: "10"
         run: |
           set -euo pipefail
-          cols="${PREVIEW_COLUMNS:-id,name}"
+          cols="${PREVIEW_COLUMNS:-id,title}"
           headers="${PREVIEW_HEADERS:-}"
           limit="${PREVIEW_LIMIT:-10}"
 
