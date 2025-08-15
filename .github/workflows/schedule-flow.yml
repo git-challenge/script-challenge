@@ -21,50 +21,71 @@ env:
   SMTP_PASS: ${{ secrets.SMTP_PASS }}
   FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
 
+
 jobs:
   set-matrix:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.one_block.outputs.matrix }}
+
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11", cache: "pip", cache-dependency-path: "**/requirements.txt" }
-      - run: pip install -r requirements.txt
-      - id: one_block
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: "**/requirements.txt"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Build matrix from "config/queries.yml"
+        id: one_block
         run: |
           python <<'PY'
           import yaml, os, json
-          cfg = yaml.safe_load(open("config/queries.yml","r",encoding="utf-8")) or {}
-          names = [item["name"] for item in cfg.get("reports", [])]
-          with open(os.environ["GITHUB_OUTPUT"], "a") as gh:
-              gh.write(f"matrix={json.dumps({'name': names})}\n")
+          cfg = yaml.safe_load(open("config/queries.yml", "r", encoding="utf-8")) or {}
+          names = [item['name'] for item in cfg.get('reports', [])]
+          print("Matrix names:", names)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as gh_output:
+              gh_output.write(f"matrix={json.dumps({'name': names})}\n")
           PY
 
   build:
     needs: set-matrix
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    environment: develop
+
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.11", cache: "pip", cache-dependency-path: "**/requirements.txt" }
-      - run: pip install -r requirements.txt
 
-      - name: Single-report config
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: "**/requirements.txt"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build single-report "config/queries.yml"
         run: |
           python <<'PY'
           import yaml
           name = "${{ matrix.name }}"
-          cfg = yaml.safe_load(open("config/queries.yml","r",encoding="utf-8")) or {}
-          rep = [r for r in (cfg.get("reports") or []) if r.get("name") == name]
+          cfg = yaml.safe_load(open("config/queries.yml", "r", encoding="utf-8")) or {}
+          rep = [report for report in (cfg.get("reports") or []) if report.get("name") == name]
           if not rep:
               raise SystemExit(f"No se encontró 'name={name}' en config/queries.yml")
           cfg["reports"] = rep
-          open("config/_one.yml","w",encoding="utf-8").write(
+          open("config/_one.yml", "w", encoding="utf-8").write(
               yaml.safe_dump(cfg, sort_keys=False, allow_unicode=True)
           )
           PY
