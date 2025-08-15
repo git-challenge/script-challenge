@@ -73,6 +73,7 @@ jobs:
         shell: bash
         env:
           NAME: ${{ matrix.name }}
+          API_URL: ${{ secrets.API_URL }}
         run: |
           set -euo pipefail
           attempts=5
