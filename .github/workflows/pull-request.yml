@@ -1,34 +1,147 @@
-name: PR - Preview
+name: Python app - Flow PR report
 
 on:
   pull_request:
-    branches: ["main"]
+    branches: ["main", "develop"]
     types: ["opened", "synchronize", "reopened"]
+    paths: ["config/queries.yml"]
 
 permissions:
   contents: read
+  actions: write
+
+# Cancela el run anterior de la misma PR
+concurrency:
+  group: pr-preview-${{ github.event.pull_request.head.ref }}
+  cancel-in-progress: true
+
+env:
+  MAX_RUNTIME: 300
 
 jobs:
-  draft:
+  set-matrix:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.one_block.outputs.matrix }}
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+      # Set up python and install dependencies
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip" # caching pip dependencies
+          cache-dependency-path: "./requirements.txt"
 
-      - name: Just for check
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Build matrix from "config/queries.yml"
+        id: one_block
+        run: |
+          python <<'PY'
+          import yaml, os, json
+
+          my_file = "config/queries.yml"
+
+          with open(my_file, 'r', encoding='utf8') as f:
+              cfg = yaml.safe_load(f) or {}
+
+          # Extraer nombres de los reports
+          names = [item['name'] for item in cfg.get('reports', [])]
+          print("Matrix names:", names)
+
+          # Guardar en GITHUB_OUTPUT
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as gh_output:
+              gh_output.write(f"matrix={json.dumps({'name': names})}\n")
+          PY
+
+  build:
+    needs: set-matrix
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
+
+    steps:
+      # Basic checkout
+      - uses: actions/checkout@v5
+
+      # Set up python and install dependencies
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip" # caching pip dependencies
+          cache-dependency-path: "./requirements.txt"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build single-report "config/queries.yml"
+        run: |
+          python <<'PY'
+          import yaml
+
+          name = "${{ matrix.name }}"
+
+          cfg = yaml.safe_load(open("config/queries.yml", "r", encoding="utf-8")) or {}
+          rep = [
+              report for report in (cfg.get("reports") or []) if report["name"] == name
+          ]
+
+          if not rep:
+              raise SystemExit(f"No se encontró 'name={name} en config/queries.yml")
+          cfg["reports"] = rep
+
+
+          open("config/_one.yml", "w", encoding="utf-8").write(
+              yaml.safe_dump(cfg, sort_keys=False, allow_unicode=True)
+          )
+          PY
+
+      - name: Run python script (dry-run)
         shell: bash
+        env:
+          NAME: ${{ matrix.name }}
         run: |
           set -euo pipefail
+          attempts=3
+          delay=2
+          start=$SECONDS
+          cmd=(python ./artworks-report.py --config "config/_one.yml" --out "out/${NAME}" --dry-run)
 
-          SOURCE_BRANCH="${GITHUB_HEAD_REF}"
-          TARGET_BRANCH="${GITHUB_BASE_REF}"
+          for ((i=1;i<=attempts;i++)); do
+              echo "🤖 Ejecutando el intento $i de ${attempts} → ${cmd[*]}"
+              if "${cmd[@]}"; then
+                  echo "✅ Éxito en el intento $i"
+                  break
+              fi
+          now=$SECONDS
+          elapsed=$(( now - start ))
+          if (( elapsed > ${MAX_RUNTIME} )); then
+              echo "🛎️ Upsss, tiempo excedido. Abortando"
+              exit 1
+          fi
 
-          echo "Validando GitFlow..."
-          echo "📌 PR source branch: $SOURCE_BRANCH"
-          echo "➡ PR target branch: $TARGET_BRANCH"
+          if (( i < attempts )); then
+              echo "🚨 Falló el intento $i. Se esperará ${delay}s antes de intentar de nuevo..."
+              sleep ${delay}
+              delay=$(( delay * 2 ))
+          else 
+              echo "❌ Todos los intentos fallaron..."
+              exit 1
+          fi
+          done
 
-          fail() {
-            echo "❌ ERROR: $1"
-            exit 1
-          }
+
+      - name: Upload artifact (one report)
+        uses: actions/upload-artifact@v4
+        with:
+          name: PR-reports-preview-${{ matrix.name }}
+          path: out/${{ matrix.name }}/**
+          if-no-files-found: error
+          retention-days: 15
+      

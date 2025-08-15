@@ -1,30 +1,36 @@
-import os
-import json
 import logging
-from datetime import datetime
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
+import os
+from typing import Dict, Any
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+from weasyprint import HTML
+from src.utils import project_root, resolve_path, utc_now_str
 
 
-def generate_report(data):
-    os.makedirs("artifacts/json", exist_ok=True)
-    os.makedirs("artifacts/pdf", exist_ok=True)
+def _jinja_env() -> Environment:
+    templates_dir = os.path.join(project_root(), "templates")
+    
+    return Environment(
+        loader=FileSystemLoader(templates_dir),
+        autoescape=select_autoescape(["html", "xml"])
+    )
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+def render_pdf(report_cfg: Dict[str, Any], data: Dict[str, Any], pdf_path: str, save_html: bool = True) -> None:
+    env = _jinja_env()
+    template = env.get_template("report.html")
 
-    json_path = f"artifacts/json/report_{timestamp}.json"
-    with open(json_path, "w") as f:
-        json.dump(data, f, indent=2)
-    logging.info(f"JSON saved at {json_path}")
+    ctx = {
+        "generated_at": utc_now_str(),
+        "report": report_cfg,
+        "items": data.get("items", []),
+        "count": data.get("count", 0),
+    }
+    html_str = template.render(**ctx)
 
-    pdf_path = f"artifacts/pdf/report_{timestamp}.pdf"
-    c = canvas.Canvas(pdf_path, pagesize=letter)
-    c.drawString(100, 750, "Artworks Report")
-    y = 700
-    for item in data:
-        c.drawString(100, y, str(item))
-        y -= 20
-    c.save()
-    logging.info(f"PDF saved at {pdf_path}")
+    os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
+    if save_html:
+        html_path = os.path.splitext(pdf_path)[0] + ".html"
+        with open(html_path, "w", encoding="utf-8") as f:
+            f.write(html_str)
 
-    return pdf_path, json_path
+    logging.info(f"[{report_cfg.get('name')}] rendering PDF -> {pdf_path}")
+    HTML(string=html_str, base_url=project_root()).write_pdf(pdf_path)

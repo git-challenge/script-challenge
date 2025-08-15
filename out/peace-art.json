@@ -1,0 +1,140 @@
+{
+  "report": {
+    "name": "peace-art",
+    "search": "peace",
+    "fields": [
+      "id",
+      "title",
+      "artist_title, date_display"
+    ],
+    "max_items": 25
+  },
+  "items": [
+    {
+      "id": 222761,
+      "title": "Untitled (Composition for a Peace Poster)",
+      "artist_title": "Alberto Beltrán"
+    },
+    {
+      "id": 192502,
+      "title": "Peace Employee",
+      "artist_title": "Ed Paschke"
+    },
+    {
+      "id": 149778,
+      "title": "Allegory of Peace and War",
+      "artist_title": "Pompeo Girolamo Batoni"
+    },
+    {
+      "id": 95613,
+      "title": "At the Justice of the Peace",
+      "artist_title": "Pieter Verhaert"
+    },
+    {
+      "id": 194625,
+      "title": "Peace Warrior (Samurai) 7",
+      "artist_title": "Carl Chiarenza"
+    },
+    {
+      "id": 50750,
+      "title": "The Kiss of Peace",
+      "artist_title": "Julia Margaret Cameron"
+    },
+    {
+      "id": 58625,
+      "title": "Head of a Woman",
+      "artist_title": "Pablo Picasso"
+    },
+    {
+      "id": 76275,
+      "title": "Street Scenes in Times of Peace 太平風會圖",
+      "artist_title": "Zhu Yu"
+    },
+    {
+      "id": 120154,
+      "title": "Still Life—Strawberries, Nuts, &c.",
+      "artist_title": "Raphaelle Peale"
+    },
+    {
+      "id": 40388,
+      "title": "Olivia Simes Morris",
+      "artist_title": "James Peale"
+    },
+    {
+      "id": 76306,
+      "title": "Lancaster: Peace and War",
+      "artist_title": "David Cox, the elder"
+    },
+    {
+      "id": 105100,
+      "title": "Samuel Fisher Bradford",
+      "artist_title": "Rembrandt Peale"
+    },
+    {
+      "id": 156072,
+      "title": "Abigail Inskeep Bradford",
+      "artist_title": "Rembrandt Peale"
+    },
+    {
+      "id": 78506,
+      "title": "John Nicholson",
+      "artist_title": "Charles Willson Peale"
+    },
+    {
+      "id": 84866,
+      "title": "Portrait of a Woman",
+      "artist_title": "Anna Claypoole Peale"
+    },
+    {
+      "id": 78507,
+      "title": "Mrs. John Nicholson (Hannah Duncan) and John Nicholson, Jr.",
+      "artist_title": "Charles Willson Peale"
+    },
+    {
+      "id": 33108,
+      "title": "Scarf",
+      "artist_title": "Echo Design Group"
+    },
+    {
+      "id": 38729,
+      "title": "And on Earth, Peace",
+      "artist_title": "Reinhold H. Palenske"
+    },
+    {
+      "id": 47795,
+      "title": "Peaceful Wild Animals",
+      "artist_title": "Yoshida Toshi"
+    },
+    {
+      "id": 50718,
+      "title": "Carolling",
+      "artist_title": "Henry Peach Robinson"
+    },
+    {
+      "id": 146653,
+      "title": "Peace, plate four from Peace is Patriotic",
+      "artist_title": "William Weege"
+    },
+    {
+      "id": 121165,
+      "title": "Peace Demonstration, Central Park, New York City",
+      "artist_title": "Garry Winogrand"
+    },
+    {
+      "id": 21288,
+      "title": "Mars Driven Away from Peace and Abundance by Minerva",
+      "artist_title": "Agostino Carracci"
+    },
+    {
+      "id": 31797,
+      "title": "Picture Depicting Peace, Justice, and Plenty (Needlework)",
+      "artist_title": null
+    },
+    {
+      "id": 8250,
+      "title": "Mary (Polly) Lawton Bringhurst",
+      "artist_title": "James Peale"
+    }
+  ],
+  "count": 25
+}

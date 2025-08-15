@@ -1,42 +1,58 @@
 import os
-import smtplib
 import logging
+import smtplib
+from typing import Dict, Any, List, Optional
 from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
 from email import encoders
 from dotenv import load_dotenv
 
 
-load_dotenv()
+load_dotenv() 
 
-def send_email(to_email, pdf_path, json_path):
-    SMTP_SERVER = os.getenv("SMTP_SERVER")
-    SMTP_PORT = int(os.getenv("SMTP_PORT"))
-    SMTP_USER = os.getenv("SMTP_USER")
-    SMTP_PASS = os.getenv("SMTP_PASS")
+def _env_required(key: str) -> str:
+    val = os.getenv(key)
+    
+    if not val:
+        raise RuntimeError(f"Missing required env var: {key}")
+    
+    return val
 
-    logging.info(f"Sending email to {to_email}")
+def _attach_file(msg: MIMEMultipart, file_path: str) -> None:
+    with open(file_path, "rb") as f:
+        part = MIMEBase("application", "octet-stream")
+        part.set_payload(f.read())
+        encoders.encode_base64(part)
+        filename = os.path.basename(file_path)
+        part.add_header("Content-Disposition", f"attachment; filename={filename}")
+        msg.attach(part)
+
+def send_email(report_cfg: Dict[str, Any], pdf_path: str, json_path: Optional[str] = None) -> None:
+    recipients: List[str] = list(report_cfg.get("recipients") or [])
+    name = report_cfg.get("name") or "report"
+
+    if not recipients:
+        logging.warning(f"[{name}] No recipients defined; skipping email send.")
+        return
+
+    host = _env_required("SMTP_HOST")
+    port = int(os.getenv("SMTP_PORT"))
+    user = _env_required("SMTP_USER")
+    password = _env_required("SMTP_PASS")
 
     msg = MIMEMultipart()
-    msg["From"] = SMTP_USER
-    msg["To"] = to_email
-    msg["Subject"] = "Artworks Report"
+    msg["From"] = user
+    msg["To"] = ", ".join(recipients)
+    msg["Subject"] = f"Report: {name}"
+    msg.attach(MIMEText(f"Attached report '{name}'.", "plain"))
 
-    msg.attach(MIMEText("Please find attached the artworks report.", "plain"))
+    _attach_file(msg, pdf_path)
+    if json_path and os.path.exists(json_path):
+        _attach_file(msg, json_path)
 
-    for file_path in [pdf_path, json_path]:
-        with open(file_path, "rb") as attachment:
-            part = MIMEBase("application", "octet-stream")
-            part.set_payload(attachment.read())
-            encoders.encode_base64(part)
-            part.add_header(
-                "Content-Disposition",
-                f"attachment; filename={file_path.split('/')[-1]}",
-            )
-            msg.attach(part)
-
-    with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+    logging.info(f"[{name}] sending email to {len(recipients)} recipient(s)")
+    with smtplib.SMTP(host, port) as server:
         server.starttls()
-        server.login(SMTP_USER, SMTP_PASS)
+        server.login(user, password)
         server.send_message(msg)
