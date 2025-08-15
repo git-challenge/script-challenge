@@ -26,7 +26,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "-d",
-    "--dry_run",
+    "--dry-run",
     type=bool,
     default=False,
     required=False,
