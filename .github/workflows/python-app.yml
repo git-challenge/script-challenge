@@ -29,6 +29,8 @@ jobs:
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
     - name: Run application
+      env:
+        API_URL: ${{ secrets.API_URL }}
       run: python ./artworks-report.py --config "config/test.yml" --out out --dry-run
     
     - name: Verify outputs
