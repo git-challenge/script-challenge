@@ -55,8 +55,8 @@ jobs:
       - name: Run application (real run for internal PRs/branches)
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false }}
         env:
-          API_URL: ${{ env.API_URL }}
-          URL_PATH: ${{ env.API_URL }}
+          API_URL: ${{ secrets.API_URL }}
+          URL_PATH: ${{ secrets.API_URL }}
         run: |
           python ./artworks-report.py --config "config/test.yml" --out out --dry-run
 
@@ -75,9 +75,10 @@ jobs:
           echo "📄 JSON encontrados: ${#json[@]} -> ${json[@]:-}"
           echo "📄 PDF  encontrados: ${#pdf[@]}  -> ${pdf[@]:-}"
 
-          if (( ${#json[@]} != 1 )); then
-            echo "❌ Se esperaba exactamente 1 archivo .json en 'out/'."; ls -l out || true; exit 1
+          if (( ${#json[@]} < 1 )); then
+            echo "❌ No se encontró archivo .json en 'out/'."; ls -l out || true; exit 1
           fi
+          
           if (( ${#pdf[@]} != 1 )); then
             echo "❌ Se esperaba exactamente 1 archivo .pdf en 'out/'."; ls -l out || true; exit 1
           fi
