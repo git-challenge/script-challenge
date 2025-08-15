@@ -27,10 +27,8 @@ parser.add_argument(
 parser.add_argument(
     "-d",
     "--dry-run",
-    type=bool,
-    default=False,
-    required=False,
-    help="Indica si se va a mandar",
+    action="store_true",
+    help="No envía correos; solo genera salidas",
 )
 """
 def opciones_busqueda(lista_busqueda) :
