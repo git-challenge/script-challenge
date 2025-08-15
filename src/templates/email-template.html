@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{{ subject }}</title>
+        <style>
+            body {
+                font-family: Arial, Helvetica, sans-serif;
+                margin: 0;
+                padding: 0;
+                background-color: #f6f8fa;
+                color: #333;
+            }
+            .container {
+                max-width: 650px;
+                margin: 20px auto;
+                background: white;
+                border-radius: 8px;
+                overflow: hidden;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            }
+            .header {
+                background-color: #004080;
+                padding: 20px;
+                color: white;
+                text-align: center;
+            }
+            .header h1 {
+                margin: 0;
+                font-size: 22px;
+            }
+            .content {
+                padding: 20px;
+                line-height: 1.5;
+            }
+            .content p {
+                margin: 10px 0;
+            }
+            .footer {
+                background-color: #f0f0f0;
+                padding: 10px;
+                text-align: center;
+                font-size: 12px;
+                color: #777;
+            }
+            .button {
+                display: inline-block;
+                background-color: #004080;
+                color: white;
+                padding: 10px 20px;
+                text-decoration: none;
+                border-radius: 5px;
+                margin-top: 15px;
+            }
+            .button,
+            .button:link,
+            .button:visited {
+                color: #ffffff !important;
+                text-decoration: none !important;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>{{ report_name }} Ready</h1>
+            </div>
+            <div class="content">
+                <p>Hello,</p>
+                <p>Your requested report "<strong>{{ report_name }}</strong>" has been generated successfully.</p>
+                <p>Please find the attached PDF{{ has_json }}.</p>
+                <a href="#" class="button" style="color: #ffffff !important; text-decoration: none !important; display: inline-block; background-color: #004080; padding: 10px 20px; border-radius: 5px; margin-top: 15px;">
+                    View Online
+                </a>
+            </div>
+            <div class="footer">
+                <p>This is an automated message. Please do not reply.</p>
+            </div>
+        </div>
+    </body>
+</html>

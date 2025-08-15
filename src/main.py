@@ -1,24 +1,27 @@
-import logging
-from src.utils import load_queries
-from src.core import fetch_artworks, generate_report, send_email
+"""
+Entry point for the Artworks Report Generator script.
+
+This module serves as the executable entry point for the application.
+When run directly from the command line, it will invoke the CLI interface
+defined in `src.core.cli.main()`.
+
+The CLI handles:
+    - Parsing command-line arguments.
+    - Loading the YAML configuration file.
+    - Fetching data from the Art Institute of Chicago API.
+    - Generating JSON and PDF reports.
+
+Usage:
+    python -m artworks-report.py --config config/queries.yml --out out
+
+Author: Juan Sebastián Dosman
+Version: 1.0
+Date: 15th August 2025
+"""
+
+from src.core.cli import main
 
 
-def run_report(args):
-    logging.info("Loading configuration...")
-    queries = load_queries("queries.yml")
-
-    logging.info("Fetching data...")
-    data = fetch_artworks(
-        search=args.search,
-        fields=args.fields.split(","),
-        limit=args.artworks
-    )
-
-    logging.info("Generating report...")
-    pdf_path, json_path = generate_report(data)
-
-    if not args.dry_run and args.email:
-        logging.info(f"Sending report to {args.email}")
-        send_email(args.email, pdf_path, json_path)
-
-    logging.info("Done.")
+if __name__ == "__main__":
+    # Call the main CLI entry function when executed directly
+    main()

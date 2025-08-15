@@ -216,3 +216,4 @@ __marimo__/
 # Artifacts
 artifacts/json/*.json
 artifacts/pdf/*.pdf
+out/
