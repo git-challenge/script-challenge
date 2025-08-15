@@ -9,10 +9,11 @@ on:
 permissions:
   contents: read
   actions: write
+  pull-requests: write
 
 # Cancela el run anterior de la misma PR
 concurrency:
-  group: pr-preview-${{ github.event.pull_request.head.ref }}
+  group: pr-preview-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 env:
@@ -26,12 +27,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
-      # Set up python and install dependencies
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: "pip" # caching pip dependencies
-          cache-dependency-path: "./requirements.txt"
+          cache: "pip"
+          cache-dependency-path: "**/requirements.txt"
 
       - name: Install dependencies
         run: |
@@ -43,17 +44,9 @@ jobs:
         run: |
           python <<'PY'
           import yaml, os, json
-
-          my_file = "config/queries.yml"
-
-          with open(my_file, 'r', encoding='utf8') as f:
-              cfg = yaml.safe_load(f) or {}
-
-          # Extraer nombres de los reports
+          cfg = yaml.safe_load(open("config/queries.yml", "r", encoding="utf-8")) or {}
           names = [item['name'] for item in cfg.get('reports', [])]
           print("Matrix names:", names)
-
-          # Guardar en GITHUB_OUTPUT
           with open(os.environ['GITHUB_OUTPUT'], 'a') as gh_output:
               gh_output.write(f"matrix={json.dumps({'name': names})}\n")
           PY
@@ -68,15 +61,13 @@ jobs:
       matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
 
     steps:
-      # Basic checkout
       - uses: actions/checkout@v5
 
-      # Set up python and install dependencies
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: "pip" # caching pip dependencies
-          cache-dependency-path: "./requirements.txt"
+          cache: "pip"
+          cache-dependency-path: "**/requirements.txt"
 
       - name: Install dependencies
         run: pip install -r requirements.txt
@@ -85,25 +76,18 @@ jobs:
         run: |
           python <<'PY'
           import yaml
-
           name = "${{ matrix.name }}"
-
           cfg = yaml.safe_load(open("config/queries.yml", "r", encoding="utf-8")) or {}
-          rep = [
-              report for report in (cfg.get("reports") or []) if report["name"] == name
-          ]
-
+          rep = [report for report in (cfg.get("reports") or []) if report.get("name") == name]
           if not rep:
               raise SystemExit(f"No se encontró 'name={name}' en config/queries.yml")
           cfg["reports"] = rep
-
-
           open("config/_one.yml", "w", encoding="utf-8").write(
               yaml.safe_dump(cfg, sort_keys=False, allow_unicode=True)
           )
           PY
 
-      - name: Run python script (dry-run)
+      - name: Run python script (dry-run) with retries/backoff
         shell: bash
         env:
           NAME: ${{ matrix.name }}
@@ -112,44 +96,45 @@ jobs:
           set -euo pipefail
           attempts=3
           delay=2
-          start=$SECONDS
+          start=$(date +%s)
           cmd=(python ./artworks-report.py --config "config/_one.yml" --out "out/${NAME}" --dry-run)
 
           for ((i=1;i<=attempts;i++)); do
-              echo "🤖 Ejecutando el intento $i de ${attempts} → ${cmd[*]}"
-              if "${cmd[@]}"; then
-                  echo "✅ Éxito en el intento $i"
-                  break
-              fi
-          now=$SECONDS
-          elapsed=$(( now - start ))
-          if (( elapsed > ${MAX_RUNTIME} )); then
-              echo "🛎️ Upsss, tiempo excedido. Abortando"
-              exit 1
-          fi
+            echo "🤖 Ejecutando intento $i/${attempts} → ${cmd[*]}"
+            if "${cmd[@]}"; then
+              echo "✅ Éxito en el intento $i"
+              break
+            fi
 
-          if (( i < attempts )); then
-              echo "🚨 Falló el intento $i. Se esperará ${delay}s antes de intentar de nuevo..."
-              sleep ${delay}
+            now=$(date +%s)
+            elapsed=$(( now - start ))
+            if (( elapsed >= ${MAX_RUNTIME} )); then
+              echo "⏱️ Tiempo excedido (MAX_RUNTIME=${MAX_RUNTIME}s). Abortando."
+              exit 1
+            fi
+
+            if (( i < attempts )); then
+              echo "⚠️ Falló intento $i. Esperando ${delay}s antes de reintentar…"
+              sleep "${delay}"
               delay=$(( delay * 2 ))
-          else 
-              echo "❌ Todos los intentos fallaron..."
+            else
+              echo "❌ Todos los intentos fallaron."
               exit 1
-          fi
+            fi
           done
-
 
       - name: Upload artifact (one report)
         uses: actions/upload-artifact@v4
         with:
-          name: reports-${{ matrix.name }}
-          path: out/${{ matrix.name }}
+          name: reports-${{ matrix.name }}              
+          path: out/${{ matrix.name }}                  
           if-no-files-found: error
           retention-days: 15
 
   summarize:
     needs: build
     runs-on: ubuntu-latest
+    if: always()
 
     permissions: 
       contents: read
@@ -157,7 +142,7 @@ jobs:
       pull-requests: write
 
     env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ github.token }}                        
       PR_NUMBER: ${{ github.event.pull_request.number }}
     
     steps:
@@ -165,26 +150,27 @@ jobs:
         run: mkdir -p out
 
       - name: Download all report artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v5                 
         with:
-          pattern: report-*
-          merge-multiple: true
-          path: out
+          pattern: reports-*                                
+          path: out                                         
+          # merge-multiple: false                          
 
-      - name: Install jq for JSON and HTML
+      - name: Install jq
         run: |
-          apt-get update
-          apt-get install -y jq
+          sudo apt-get update
+          sudo apt-get install -y jq
 
-      - name: Build PR comment (HTML) from per-report data.json (dynamic columns)
+      # 🔎 Construye un comentario HTML a partir de <name>.json | summary.json | primer *.json
+      - name: Build PR comment (HTML) with gh
         shell: bash
         env:
-          PREVIEW_COLUMNS: "id,name"     # columnas del JSON (separadas por coma)
-          PREVIEW_HEADERS: "ID,Nombre"   # cabeceras visibles
-          PREVIEW_LIMIT: "10"            # filas máximas a mostrar
+          PREVIEW_COLUMNS: "id,title,artist_title"     
+          PREVIEW_HEADERS: "ID,Titulo,Artista"
+          PREVIEW_LIMIT: "10"
         run: |
           set -euo pipefail
-          cols="${PREVIEW_COLUMNS:-id,name}"
+          cols="${PREVIEW_COLUMNS:-id,title}"
           headers="${PREVIEW_HEADERS:-}"
           limit="${PREVIEW_LIMIT:-10}"
 
@@ -197,17 +183,27 @@ jobs:
           } > pr_comment.md
 
           shopt -s nullglob
-          for d in out/*/ ; do
-            name="$(basename "$d")"
-            js="${d%/}/data.json"
-            [[ -f "$js" ]] || js="$(ls "${d%/}"/*.json 2>/dev/null | head -n 1 || true)"
+          for d in out/reports-*/ ; do
+            artifact="$(basename "$d")"           # e.g., reports-war-art
+            name="${artifact#reports-}"           # -> war-art
+
+            # Selección del JSON a previsualizar (prioridad)
+            js="${d%/}/${name}.json"
+            if [[ ! -f "$js" ]]; then
+              js="${d%/}/summary.json"
+            fi
+            if [[ ! -f "$js" ]]; then
+              js="$(ls "${d%/}"/*.json 2>/dev/null | head -n 1 || true)"
+            fi
             [[ -f "$js" ]] || continue
 
-            echo "" >> pr_comment.md
-            echo "#### ${name}" >> pr_comment.md
-            echo "<table><thead><tr>" >> pr_comment.md
+            # Cabeceras HTML
+            {
+              echo ""
+              echo "#### ${name}"
+              echo "<table><thead><tr>"
+            } >> pr_comment.md
 
-            # Cabeceras
             IFS=, read -ra c <<< "$cols"
             if [[ -n "$headers" ]]; then
               IFS=, read -ra h <<< "$headers"
@@ -217,11 +213,15 @@ jobs:
             for th in "${h[@]}"; do printf '<th>%s</th>' "$th" >> pr_comment.md; done
             echo "</tr></thead><tbody>" >> pr_comment.md
 
-            # Filas (dinámicas): usa las claves indicadas en PREVIEW_COLUMNS
+            # Filas desde el JSON: soporta raíz array o {data:[...]} o {items:[...]}
             jq -r --arg cols "$cols" --argjson limit "$limit" '
               def h: tostring|@html;
-              ( (type=="array")? . : .data )
-              | .[:$limit][] as $row
+              def rows:
+                if (type=="array") then .
+                elif has("data") then .data
+                elif has("items") then .items
+                else [] end ;
+              (rows | .[:$limit])[] as $row
               | ($cols | split(",")) as $cols
               | "<tr>" + ( $cols
                   | map( "<td>" + ( $row[.] // "" | tostring | h ) + "</td>" )
@@ -229,44 +229,61 @@ jobs:
             ' "$js" >> pr_comment.md
 
             echo "</tbody></table>" >> pr_comment.md
+
+            # Nota de archivos producidos (no se puede linkear directo al archivo del artifact)
+            echo "<sub>Archivos: <code>${name}.pdf</code>, <code>${name}.json</code>, <code>summary.json</code>, <code>*.html</code> (descarga desde los artifacts de este run).</sub>" >> pr_comment.md
           done
 
           {
             echo
             echo "</details>"
             echo
-            echo "<sub>Descarga PDF/JSON completos desde los artifacts de este run.</sub>"
+            echo "<sub>Descarga los PDFs/JSON completos desde los artifacts <i>reports-&lt;name&gt;</i> de este run.</sub>"
           } >> pr_comment.md
 
-          head -n 20 pr_comment.md
-      
-
-      - name: Create/Update sticky PR comment with gh
-        if: ${{ env.PR_NUMBER != '' }}
-        shell: bash
-        run: |
-          set -euo pipefail
+          # Publica/actualiza comentario pegajoso
           OWNER="${GITHUB_REPOSITORY%%/*}"
           REPO="${GITHUB_REPOSITORY##*/}"
           MARK="<!-- report-preview-marker -->"
 
-          # Busca comentario previo del bot con el marcador
           CID="$(gh api repos/$OWNER/$REPO/issues/$PR_NUMBER/comments \
                 --jq '[.[] | select(.user.type == "Bot" and (.body|contains("'"$MARK"'")))] | .[0].id' \
-                | tr -d '\n')"
+                | tr -d '\n' || true)"
 
           if [[ -n "${CID}" && "${CID}" != "null" ]]; then
             echo "🔁 Actualizando comentario existente ($CID)…"
-            gh api \
-              --method PATCH \
-              -H "Accept: application/vnd.github+json" \
+            gh api --method PATCH -H "Accept: application/vnd.github+json" \
               /repos/$OWNER/$REPO/issues/comments/$CID \
               -f body="$(cat pr_comment.md)"
           else
             echo "🆕 Creando comentario nuevo…"
-            gh api \
-              --method POST \
-              -H "Accept: application/vnd.github+json" \
+            gh api --method POST -H "Accept: application/vnd.github+json" \
               /repos/$OWNER/$REPO/issues/$PR_NUMBER/comments \
               -f body="$(cat pr_comment.md)"
           fi
+
+      # (Opcional) También deja un pequeño resumen en el panel del run
+      - name: Action Summary (conteo por reporte)
+        shell: bash
+        run: |
+          echo "## Items por reporte" >> $GITHUB_STEP_SUMMARY
+          shopt -s nullglob
+          for d in out/reports-*/ ; do
+            artifact="$(basename "$d")"
+            name="${artifact#reports-}"
+            js="${d%/}/${name}.json"
+            if [[ ! -f "$js" ]]; then
+              js="${d%/}/summary.json"
+            fi
+            if [[ ! -f "$js" ]]; then
+              js="$(ls "${d%/}"/*.json 2>/dev/null | head -n 1 || true)"
+            fi
+            [[ -f "$js" ]] || continue
+            count="$(jq -r '
+              if (type=="array") then length
+              elif has("data") then (.data|length)
+              elif has("items") then (.items|length)
+              else 0 end
+            ' "$js")"
+            echo "- **${name}**: ${count} ítems" >> $GITHUB_STEP_SUMMARY
+          done
