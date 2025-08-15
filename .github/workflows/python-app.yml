@@ -10,58 +10,76 @@ permissions:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
     environment: develop
 
     steps:
-    - uses: actions/checkout@v5
-    - name: Set up Python 3.11
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
-        cache: "pip" # caching pip dependencies
-        cache-dependency-path: "./requirements.txt"
-  
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      - uses: actions/checkout@v5
 
-    - name: Run application
-      env:
-        API_URL: ${{ secrets.API_URL }}
-      run: python ./artworks-report.py --config "config/test.yml" --out out --dry-run
-    
-    - name: Verify outputs
-      run: |
-        set -euo pipefail
-        if [ ! -d out ]; then
-          echo "❌ Upss... No existe el directorio out"
-          exit 1
-        fi
-        
-        # Habilitar nullglob para asegurar expansión aún sin archivos
-        shopt -s nullglob
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: "./requirements.txt"
 
-        json=(out/*.json)
-        pdf=(out/*.pdf)
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-        echo "📄 JSON encontrados: ${#json[@]} -> ${json[@]:-}"
-        echo "📄 PDF  encontrados: ${#pdf[@]}  -> ${pdf[@]:-}"
+      # 🔐 Exporta API_URL desde el Environment "develop".
+      - name: Export API_URL from environment secret
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false }}
+        run: |
+          # Usa el que exista: API_URL o URL_PATH (mapea a API_URL)
+          if [[ -n "${{ secrets.API_URL }}" ]]; then
+            echo "API_URL=${{ secrets.API_URL }}" >> "$GITHUB_ENV"
+          elif [[ -n "${{ secrets.URL_PATH }}" ]]; then
+            echo "API_URL=${{ secrets.URL_PATH }}" >> "$GITHUB_ENV"
+          else
+            echo "❌ No se encontró el secreto API_URL ni URL_PATH en el environment 'develop'." >&2
+            exit 1
+          fi
 
-        if (( ${#json[@]} != 1 )); then
-          echo "❌ Se esperaba exactamente 1 archivo .json en 'out/'."
-          ls -l out || true
-          exit 1
-        fi
+      # ✅ Chequeo de presencia
+      - name: Sanity check API_URL (internal only)
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false }}
+        run: |
+          if [[ -z "${API_URL:-}" ]]; then
+            echo "❌ API_URL no está disponible"; exit 1
+          fi
+          echo "API_URL presente ✅ (valor oculto)"
 
-        if (( ${#pdf[@]} != 1 )); then
-          echo "❌ Se esperaba exactamente 1 archivo .pdf en 'out/'."
-          ls -l out || true
-          exit 1
-        fi
+      # ▶️ Ejecuta de verdad cuando NO es PR de fork
+      - name: Run application (real run for internal PRs/branches)
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false }}
+        env:
+          API_URL: ${{ env.API_URL }}
+          URL_PATH: ${{ env.API_URL }}
+        run: |
+          python ./artworks-report.py --config "config/test.yml" --out out --dry-run
 
-        echo "✅ Validación OK"
+      - name: Verify outputs
+        run: |
+          set -euo pipefail
+          if [ ! -d out ]; then
+            echo "❌ Upss... No existe el directorio out"
+            exit 1
+          fi
 
+          shopt -s nullglob
+          json=(out/*.json)
+          pdf=(out/*.pdf)
 
+          echo "📄 JSON encontrados: ${#json[@]} -> ${json[@]:-}"
+          echo "📄 PDF  encontrados: ${#pdf[@]}  -> ${pdf[@]:-}"
+
+          if (( ${#json[@]} != 1 )); then
+            echo "❌ Se esperaba exactamente 1 archivo .json en 'out/'."; ls -l out || true; exit 1
+          fi
+          if (( ${#pdf[@]} != 1 )); then
+            echo "❌ Se esperaba exactamente 1 archivo .pdf en 'out/'."; ls -l out || true; exit 1
+          fi
+
+          echo "✅ Validación OK"
