@@ -1,20 +1,27 @@
-import sys
-from src.config import setup_logging
-from src.core import build_parser
-from src.main import run_report
+"""
+Entry point for the Artworks Report Generator script.
 
+This module serves as the executable entry point for the application.
+When run directly from the command line, it will invoke the CLI interface
+defined in `src.core.cli.main()`.
 
-def main():
-    setup_logging()
-    parser = build_parser()
-    args = parser.parse_args()
+The CLI handles:
+    - Parsing command-line arguments.
+    - Loading the YAML configuration file.
+    - Fetching data from the Art Institute of Chicago API.
+    - Generating JSON and PDF reports.
 
-    try:
-        run_report(args)
-    except Exception as e:
-        import logging
-        logging.exception("Error executing report")
-        sys.exit(1)
+Usage:
+    python -m artworks-report.py --config config/queries.yml --out out
+
+Author: Juan Sebastián Dosman
+Version: 1.0
+Date: 15th August 2025
+"""
+
+from src.core.cli import main
+
 
 if __name__ == "__main__":
+    # Call the main CLI entry function when executed directly
     main()

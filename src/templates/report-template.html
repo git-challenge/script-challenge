@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8"/>
+        <title>{{ report.name }} — Artworks Report</title>
+        <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; margin: 32px; }
+            h1 { margin-bottom: 8px; }
+            .meta { color: #555; margin-bottom: 24px; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border-bottom: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
+            th { background: #f6f6f6; }
+            .count { margin: 8px 0 24px; font-weight: 600; }
+            .small { font-size: 12px; color: #666; }
+        </style>
+    </head>
+    <body>
+        <h1>Report: {{ report.name }}</h1>
+        <div class="meta">
+            Generated at: {{ generated_at }}<br/>
+            Search: <strong>{{ report.search }}</strong> |
+            Fields: <strong>{{ report.fields | join(", ") }}</strong> |
+            Max items: <strong>{{ report.max_items }}</strong>
+        </div>
+
+        <div class="count">Items: {{ count }}</div>
+
+        <table>
+            <thead>
+            <tr>
+                {% for f in report.fields %}
+                <th>{{ f }}</th>
+                {% endfor %}
+            </tr>
+            </thead>
+            <tbody>
+            {% for it in items %}
+            <tr>
+                {% for f in report.fields %}
+                <td>{{ it.get(f, "") }}</td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+        <p class="small">Source: Art Institute of Chicago API</p>
+    </body>
+</html>
