@@ -1,0 +1,111 @@
+name: Nightly Reports (matrix)
+
+on:
+  schedule:
+    - cron: '0 6 * * *'    # 06:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: nightly-reports
+  cancel-in-progress: false
+
+env:
+  MAX_RUNTIME: 900
+  SMTP_HOST: ${{ secrets.SMTP_HOST }}
+  SMTP_PORT: ${{ secrets.SMTP_PORT }}
+  SMTP_USER: ${{ secrets.SMTP_USER }}
+  SMTP_PASS: ${{ secrets.SMTP_PASS }}
+  FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
+
+jobs:
+  set-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.one_block.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11", cache: "pip", cache-dependency-path: "**/requirements.txt" }
+      - run: pip install -r requirements.txt
+      - id: one_block
+        run: |
+          python <<'PY'
+          import yaml, os, json
+          cfg = yaml.safe_load(open("config/queries.yml","r",encoding="utf-8")) or {}
+          names = [item["name"] for item in cfg.get("reports", [])]
+          with open(os.environ["GITHUB_OUTPUT"], "a") as gh:
+              gh.write(f"matrix={json.dumps({'name': names})}\n")
+          PY
+
+  build:
+    needs: set-matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11", cache: "pip", cache-dependency-path: "**/requirements.txt" }
+      - run: pip install -r requirements.txt
+
+      - name: Single-report config
+        run: |
+          python <<'PY'
+          import yaml
+          name = "${{ matrix.name }}"
+          cfg = yaml.safe_load(open("config/queries.yml","r",encoding="utf-8")) or {}
+          rep = [r for r in (cfg.get("reports") or []) if r.get("name") == name]
+          if not rep:
+              raise SystemExit(f"No se encontró 'name={name}' en config/queries.yml")
+          cfg["reports"] = rep
+          open("config/_one.yml","w",encoding="utf-8").write(
+              yaml.safe_dump(cfg, sort_keys=False, allow_unicode=True)
+          )
+          PY
+
+      - name: Run script (send emails) with retries/backoff
+        shell: bash
+        env:
+          NAME: ${{ matrix.name }}
+        run: |
+          set -euo pipefail
+          attempts=5
+          delay=2
+          start=$(date +%s)
+          cmd=(python ./artworks-report.py --config "config/_one.yml" --out "out/${NAME}")
+
+          for ((i=1; i<=attempts; i++)); do
+            echo "🤖 Intento $i/${attempts} → ${cmd[*]}"
+            if "${cmd[@]}"; then
+              echo "✅ Éxito en el intento $i"
+              break
+            fi
+            now=$(date +%s)
+            elapsed=$(( now - start ))
+            if (( elapsed >= ${MAX_RUNTIME} )); then
+              echo "⏱️ Tiempo excedido (MAX_RUNTIME=${MAX_RUNTIME}s). Abortando."
+              exit 1
+            fi
+            if (( i < attempts )); then
+              echo "⚠️ Falló intento $i. Esperando ${delay}s antes de reintentar…"
+              sleep "${delay}"
+              delay=$(( delay * 2 ))
+            else
+              echo "❌ Todos los intentos fallaron."
+              exit 1
+            fi
+          done
+
+      - name: Upload artifact (one report)
+        uses: actions/upload-artifact@v5
+        with:
+          name: report-${{ matrix.name }}
+          path: out/${{ matrix.name }}/**
+          retention-days: 15
+
