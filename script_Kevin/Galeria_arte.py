@@ -172,6 +172,6 @@ if __name__ == '__main__':
 
 # Una consulta como base :
 
-#  python3 Galeria_arte.py -o ""name":"peace-art" "fields":["id","title","artist_title","date_display"] "max_items":25 "search":"peace" "recipients":["beatrizarroyave2003@gmail.com"]" -o json -d True
+#  python3 Galeria_arte.py -o ""name":"peace-art" "fields":["id","title","artist_title","date_display"] "max_items":25 "search":"peace" "recipients":[""]" -o json -d True
 
     
